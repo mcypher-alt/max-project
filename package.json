@@ -1,0 +1,29 @@
+{
+  "name": "my-monorepo",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "nanoid": "^3.3.18"
+  },
+  "scripts": {
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "db:generate": "npx prisma generate --schema=server/prisma/schema.prisma",
+    "db:migrate": "export $(cat server/.env | xargs) && npx prisma migrate dev --schema=server/prisma/schema.prisma",
+    "db:seed": "export $(cat server/.env | xargs) && npx prisma db seed",
+    "db:studio": "export $(cat server/.env | xargs) && npx prisma studio --schema=server/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "prisma": {
+    "seed": "npx tsx server/prisma/seed.ts"
+  }
+}

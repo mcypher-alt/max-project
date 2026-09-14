@@ -1,0 +1,105 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Company {
+  id      String   @id // Например: 'uk_vostok', 'uk_zapad'
+  name    String   // Название: 'УК Восток-Сервис'
+  
+  users   User[]
+  tickets Ticket[]
+  houses  House[]  // Новая связь: одной компании принадлежит много домов
+}
+
+model House {
+  id        Int      @id @default(autoincrement())
+  address   String   // Например: "ул. Ленина, д. 10"
+  
+  companyId String   // К какой УК относится дом
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([address, companyId]) // Защита от дублей адресов внутри одной УК
+  @@map("houses")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique // Логин будет по телефону
+  password  String   // Хэшированный bcrypt'ом пароль
+  name      String   // Имя мастера или диспетчера (например, "Петрович")
+  role      String   // 'admin', 'dispatcher', 'master'
+  
+  companyId String   // К какой УК привязан сотрудник
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  tickets   Ticket[] @relation("MasterTickets")
+}
+
+model ValidToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  role      String   // "DISPATCHER" или "MASTER"
+  phone     String
+  companyId String   // К какой УК привязан инвайт
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("valid_tokens")
+}
+
+model Ticket {
+  id             Int       @id @default(autoincrement())
+  address        String    // Адрес (ул. Ленина, д. 10, кв. 5)
+  description    String    // Суть проблемы ("Течет труба в ванной")
+  type           String    // 'emergency' (экстренная — таймер 30 мин) или 'regular' (обычная)
+  status         String    // 'new', 'in_work', 'completed'
+  
+  createdAt      DateTime  @default(now())
+  assignedAt     DateTime? // Когда диспетчер назначил мастера
+  completedAt    DateTime? // Когда мастер нажал "Выполнено"
+
+  companyId      String
+  company        Company   @relation(fields: [companyId], references: [id])
+  
+  masterId       Int?      // Может быть пустой, пока диспетчер не назначил
+  master         User?     @relation("MasterTickets", fields: [masterId], references: [id])
+
+  photos         TicketPhoto[]
+
+  managerRating  Int?      // Оценка от 1 до 5
+  managerComment String?   // Комментарий диспетчера по итогу работы
+}
+
+model TicketPhoto {
+  id        Int      @id @default(autoincrement())
+  url       String   // Ссылка на фото в S3
+  createdAt DateTime @default(now())
+
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model MeterReading {
+  id        Int      @id @default(autoincrement())
+  companyId String
+  address   String   // К какому адресу привязаны показания
+  type      String   // ХВС, ГВС, ЭЭ
+  value     Float
+  createdAt DateTime @default(now())
+
+  @@map("meter_readings")
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

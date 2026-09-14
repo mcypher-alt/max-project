@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Тест скрипта Тильды</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 p-8 flex flex-col items-center justify-center min-h-screen">
+
+    <div class="bg-white p-6 rounded-xl shadow-md max-w-md w-full">
+        <h2 class="text-xl font-bold mb-4 text-slate-800">Имитация формы Тильды</h2>
+        
+        <form class="t-form space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Адрес (address)</label>
+                <input type="text" name="address" value="ул. Пушкина, д. 4, кв. 12" class="mt-1 block w-full rounded-md border p-2 bg-transparent text-black" required>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Описание (description)</label>
+                <textarea name="description" class="mt-1 block w-full rounded-md border p-2 bg-transparent text-black" required>Засор в раковине, вода не уходит</textarea>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Приоритет (type)</label>
+                <select name="type" class="mt-1 block w-full rounded-md border p-2 bg-white text-black">
+                    <option value="regular">Regular</option>
+                    <option value="emergency">Emergency</option>
+                </select>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 font-medium">
+                Отправить заявку
+            </button>
+        </form>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Указываем URL локального бэкенда
+        const BACKEND_URL = 'http://localhost:5000/api/tickets/tilda-direct-ticket';
+        const COMPANY_ID = 'crocus';
+
+        const forms = document.querySelectorAll('.t-form');
+        
+        forms.forEach(function(form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault(); 
+
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.innerHTML = 'Отправка...';
+                submitBtn.disabled = true;
+
+                const formData = new FormData(form);
+                const data = {
+                    companyId: COMPANY_ID,
+                    address: formData.get('address'), 
+                    description: formData.get('description'), 
+                    type: formData.get('type') || 'regular'
+                };
+
+                try {
+                    const response = await fetch(BACKEND_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        form.style.display = 'none';
+                        const successHtml = `
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 12px; text-align: center; font-family: sans-serif;">
+                                <h3 style="color: #166534; margin-bottom: 10px;">✅ Заявка принята!</h3>
+                                <p style="color: #15803d; margin-bottom: 15px; font-size: 14px;">Ссылка на трекер:</p>
+                                <a href="${result.trackingLink}" target="_blank" style="display: inline-block; background: #16a34a; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+                                    Открыть статус заявки ➔
+                                </a>
+                            </div>
+                        `;
+                        form.insertAdjacentHTML('afterend', successHtml);
+                    } else {
+                        alert('Ошибка сервера');
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Ошибка соединения. Убедись, что бэк запущен и CORS включен!');
+                    submitBtn.innerHTML = originalBtnText;
+                    submitBtn.disabled = false;
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html>
