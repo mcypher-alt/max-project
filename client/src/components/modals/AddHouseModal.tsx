@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { toast } from 'sonner';
+import { COMPANY_NAMES } from '../common/consts';
 
 export interface HouseFormData {
   companyId: string;
@@ -77,7 +78,7 @@ export function AddHouseModal({
               )}
               {userCompanies.map((id) => (
                 <option key={id} value={id}>
-                  {id === 'crocus' ? 'АО Крокус' : id === 'meridian' ? 'Меридиан' : id}
+                  {COMPANY_NAMES[id] || id}
                 </option>
               ))}
             </select>

@@ -35,9 +35,7 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
         return res.status(401).json({ error: 'Неверный номер телефона или пароль' });
         }
 
-        const companies = (user.role === 'admin' || user.role === 'dispatcher')
-        ? ['crocus', 'meridian'] // Список всех твоих УК
-        : [user.companyId];
+        const companies = [user.companyId];
 
         const token = jwt.sign(
         {
@@ -100,11 +98,6 @@ router.get('/me', (req: Request, res: Response): any => {
 
         // Логика расширения прав для диспетчера и админа
         let userCompanies: string | string[] = decoded.companyId;
-
-        if (decoded.role === 'dispatcher' || decoded.role === 'admin') {
-            // Для диспетчеров и админов отдаем полный список УК
-            userCompanies = ['crocus', 'meridian'];
-        }
 
         return res.json({ 
             authenticated: true, 

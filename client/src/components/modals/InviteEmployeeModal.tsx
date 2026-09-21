@@ -1,4 +1,5 @@
 import { useState, FormEvent, MouseEvent } from 'react';
+import { COMPANY_NAMES } from '../common/consts';
 
 export interface InviteFormData {
   companyId: string;
@@ -122,7 +123,7 @@ export function InviteEmployeeModal({
                 )}
                 {userCompanies.map((id) => (
                   <option key={id} value={id}>
-                    {id === 'crocus' ? 'АО Крокус' : id === 'meridian' ? 'Меридиан' : id}
+                    {COMPANY_NAMES[id] || id}
                   </option>
                 ))}
               </select>

@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { toast } from 'sonner';
+import { COMPANY_NAMES } from '../common/consts';
 
 export interface TicketFormData {
   companyId: string;
@@ -105,7 +106,7 @@ export function CreateTicketModal({
               )}
               {userCompanies.map((id) => (
                 <option key={id} value={id}>
-                  {id === 'crocus' ? 'АО Крокус' : id === 'meridian' ? 'Меридиан' : id}
+                  {COMPANY_NAMES[id] || id}
                 </option>
               ))}
             </select>

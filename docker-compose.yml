@@ -2,12 +2,29 @@ services:
   db:
     image: postgres:16-alpine
     restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-main_db}
     env_file:
-      - .env
+      - ./server/.env
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  minio:
+    image: minio/minio:latest
+    container_name: hackathon_minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadminpassword
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API (для бэкенда и загрузки)
+      - "9001:9001" # Веб-консоль (просмотр бакетов в браузере)
+    volumes:
+      - minio_data:/data
 
   server:
     build:
@@ -15,11 +32,12 @@ services:
       dockerfile: server/Dockerfile
     restart: always
     env_file:
-      - .env
+      - ./server/.env
     ports:
       - "${SERVER_PORT:-5000}:5000"
     depends_on:
       - db
+      - minio
 
   client:
     build:
@@ -33,3 +51,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

@@ -122,6 +122,102 @@ router.post('/by-master', requireAuth(['master']), async (req: Request, res: Res
     }
 });
 
+router.post('/by-resident', async (req: Request, res: Response): Promise<any> => {
+    const { maxUserId, description, type, photos, companyId, address, apartment } = req.body;
+
+    if (!maxUserId || !description) {
+        return res.status(400).json({ error: 'Поля maxUserId и description обязательны' });
+    }
+
+    const ticketType = type === 'emergency' ? 'emergency' : 'regular';
+
+    try {
+        // 1. Ищем жителя в базе по идентификатору из МАХ
+        let resident = await prisma.resident.findUnique({
+            where: { maxUserId: String(maxUserId) },
+            include: { house: true }
+        });
+
+        // 2. Определяем компанию и адрес: берем либо из профиля жителя, либо из тела запроса
+        const targetCompanyId = resident?.companyId || companyId;
+        const targetAddress = resident?.house?.address || address;
+        const targetApartment = resident?.apartment || apartment;
+
+        if (!targetCompanyId || !targetAddress) {
+            return res.status(400).json({ 
+                error: 'Не указана управляющая компания или адрес дома' 
+            });
+        }
+
+        // 3. Проверяем, обслуживает ли компания этот дом
+        const house = await prisma.house.findUnique({
+            where: {
+                address_companyId: {
+                    address: String(targetAddress).trim(),
+                    companyId: String(targetCompanyId)
+                }
+            }
+        });
+
+        if (!house) {
+            return res.status(400).json({ 
+                error: 'Указанный адрес не обслуживается данной управляющей компанией' 
+            });
+        }
+
+        // Если жителя еще не было в базе, регистрируем его на лету
+        if (!resident) {
+            resident = await prisma.resident.create({
+                data: {
+                    maxUserId: String(maxUserId),
+                    companyId: targetCompanyId,
+                    houseId: house.id,
+                    apartment: targetApartment ? String(targetApartment) : undefined
+                },
+                include: { house: true }
+            });
+        }
+
+        // 4. Формируем полную строку адреса с квартирой
+        const fullAddressString = targetApartment 
+            ? `${house.address}, кв. ${targetApartment}` 
+            : house.address;
+
+        // 5. Создаем тикет со статусом new и привязываем к жителю и компании
+        const newTicket = await prisma.ticket.create({
+            data: {
+                address: fullAddressString,
+                apartment: targetApartment ? String(targetApartment) : undefined,
+                description,
+                type: ticketType,
+                status: 'new',
+                company: { connect: { id: targetCompanyId } },
+                house: { connect: { id: house.id } },
+                resident: { connect: { id: resident.id } },
+                photos: photos?.length
+                    ? {
+                        create: photos.map((url: string) => ({ url }))
+                      }
+                    : undefined
+            },
+            include: {
+                photos: true,
+                company: { select: { id: true, name: true } },
+                house: { select: { address: true } }
+            }
+        });
+
+        return res.status(201).json({
+            success: true,
+            ticket: newTicket
+        });
+
+    } catch (error) {
+        console.error('Ошибка при создании заявки жителем:', error);
+        return res.status(500).json({ error: 'Не удалось зарегистрировать обращение' });
+    }
+});
+
 /**
  * 2. POST /assign — Назначение мастера на заявку (Диспетчер / Админ)
  */
@@ -310,6 +406,41 @@ router.get('/my', requireAuth(['master', 'admin']), async (req: Request, res: Re
         return res.json({ tickets: myTickets });
     } catch (error) {
         console.error('Ошибка при получении заявок мастера:', error);
+        return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+
+// получения заявок жителей
+router.get('/by-resident', async (req: Request, res: Response): Promise<any> => {
+    try {
+        const { maxUserId } = req.query;
+
+        if (!maxUserId) {
+            return res.status(400).json({ error: 'Параметр maxUserId обязателен' });
+        }
+
+        const resident = await prisma.resident.findUnique({
+            where: { maxUserId: String(maxUserId) },
+            select: { id: true }
+        });
+
+        if (!resident) {
+            return res.json({ tickets: [] });
+        }
+
+        const tickets = await prisma.ticket.findMany({
+            where: { residentId: resident.id },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                photos: { select: { id: true, url: true } },
+                company: { select: { id: true, name: true } },
+                master: { select: { name: true } }
+            }
+        });
+
+        return res.json({ tickets });
+    } catch (error) {
+        console.error('Ошибка получения заявок жителя:', error);
         return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });

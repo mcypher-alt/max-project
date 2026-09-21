@@ -12,6 +12,7 @@ import registrationRouter from './routes/registration.js';
 import houseRouter from './routes/houses.js';
 import passwordRouter from './routes/password.js';
 import mobileRouter from './routes/mobile-id.js';
+import residentsRouter from './routes/residents.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.use('/api/tickets', ticketsRouter);
 app.use('/api/meters', metersRouter);
 app.use('/api/login', loginRouter);
 app.use('/api/registration', registrationRouter);
+app.use('/api/residents', residentsRouter);
 
 app.get('/health', (req, res) => {
     res.json({status: "ok", message: "Сервер работает."});

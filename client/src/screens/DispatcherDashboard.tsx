@@ -7,6 +7,7 @@ import type { User, Ticket } from '../types.js';
 import { AddHouseModal, CreateTicketModal, InviteEmployeeModal } from '../components/modals';
 import { ActionButton, Select } from '../components/ui/index.js';
 import { StatusBadge, EmergencyTimer, MasterCell } from '../components/dashboard';
+import { COMPANY_NAMES } from '../components/common/consts.js';
 
 export default function DispatcherDashboard({ user }: { user: User }) {
   const [filters, setFilters] = useState({
@@ -181,7 +182,7 @@ const [inviteError, setInviteError] = useState<string | null>(null);
             <option value="all">Все компании</option>
             {userCompanies.map((id) => (
               <option key={id} value={id}>
-                {id === 'crocus' ? 'АО Крокус' : id === 'meridian' ? 'Меридиан' : id}
+                {COMPANY_NAMES[id] || id}
               </option>
             ))}
           </Select>

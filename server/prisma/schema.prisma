@@ -14,16 +14,40 @@ model Company {
   users   User[]
   tickets Ticket[]
   houses  House[]  // Новая связь: одной компании принадлежит много домов
+
+  residents Resident[]
+}
+
+model Resident {
+  id          Int      @id @default(autoincrement())
+  maxUserId   String   @unique // ID пользователя внутри МАХ (из вебхука или WebApp initData)
+  phone       String?  // Телефон для связи мастера с жителем
+  name        String?  // Имя или никнейм из профиля МАХ
+  apartment   String?  // Номер квартиры (например, "42")
+  
+  // Привязка к адресу и УК
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  houseId     Int?
+  house       House?   @relation(fields: [houseId], references: [id])
+
+  tickets     Ticket[] // История всех заявок жителя
+  createdAt   DateTime @default(now())
+
+  @@map("residents")
 }
 
 model House {
-  id        Int      @id @default(autoincrement())
-  address   String   // Например: "ул. Ленина, д. 10"
+  id        Int        @id @default(autoincrement())
+  address   String     // "ул. Ленина, д. 10"
   
-  companyId String   // К какой УК относится дом
-  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id])
 
-  @@unique([address, companyId]) // Защита от дублей адресов внутри одной УК
+  residents Resident[] // Жители этого дома
+  tickets   Ticket[]   // Заявки по этому дому
+
+  @@unique([address, companyId])
   @@map("houses")
 }
 
@@ -54,26 +78,35 @@ model ValidToken {
 }
 
 model Ticket {
-  id             Int       @id @default(autoincrement())
-  address        String    // Адрес (ул. Ленина, д. 10, кв. 5)
-  description    String    // Суть проблемы ("Течет труба в ванной")
-  type           String    // 'emergency' (экстренная — таймер 30 мин) или 'regular' (обычная)
-  status         String    // 'new', 'in_work', 'completed'
-  
-  createdAt      DateTime  @default(now())
-  assignedAt     DateTime? // Когда диспетчер назначил мастера
-  completedAt    DateTime? // Когда мастер нажал "Выполнено"
+  id             Int           @id @default(autoincrement())
+  address        String        // Полная строка адреса или дубль для истории ("ул. Ленина, д. 10, кв. 42")
+  apartment      String?       // Отдельное поле квартиры для удобства фильтрации
+  description    String
+  type           String        // 'emergency' или 'regular'
+  status         String        // 'new', 'in_work', 'completed'
+
+  createdAt      DateTime      @default(now())
+  assignedAt     DateTime?
+  completedAt    DateTime?
 
   companyId      String
-  company        Company   @relation(fields: [companyId], references: [id])
-  
-  masterId       Int?      // Может быть пустой, пока диспетчер не назначил
-  master         User?     @relation("MasterTickets", fields: [masterId], references: [id])
+  company        Company       @relation(fields: [companyId], references: [id])
+
+  // Связь с домом (опционально, для быстрого поиска всех аварий дома)
+  houseId        Int?
+  house          House?        @relation(fields: [houseId], references: [id])
+
+  // КТО ОСТАВИЛ ЗАЯВКУ (Житель из МАХ)
+  residentId     Int?
+  resident       Resident?     @relation(fields: [residentId], references: [id])
+
+  masterId       Int?
+  master         User?         @relation("MasterTickets", fields: [masterId], references: [id])
 
   photos         TicketPhoto[]
 
-  managerRating  Int?      // Оценка от 1 до 5
-  managerComment String?   // Комментарий диспетчера по итогу работы
+  managerRating  Int?
+  managerComment String?
 }
 
 model TicketPhoto {
