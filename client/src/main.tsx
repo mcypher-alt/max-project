@@ -1,8 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.js' // Обрати внимание на .js, если TS требует расширения
-// @ts-ignore
-import './index.css'    // Тут обычно подключается Tailwind
+import App from './App.js'
+import './index.css'
+import '@maxhub/max-ui/dist/styles.css';
+import { MaxUI } from '@maxhub/max-ui';
 import axios from 'axios';
 
 axios.defaults.baseURL = 'http://localhost:5000';
@@ -16,7 +17,9 @@ if (parts.length > 1 && parts[0] !== 'localhost') {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <MaxUI>
+      <App />
+    </MaxUI>
   </React.StrictMode>,
 )
 

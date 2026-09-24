@@ -14,13 +14,51 @@ export const authApi = {
   logout: async () => (await api.post('/login/logout')).data,
 };
 
+export const residentsApi = {
+    // Синхронизация при входе в мини-апп
+    sync: async (data: { maxUserId: string; name?: string; phone?: string }) => {
+        const response = await api.post('/residents/sync', data);
+        return response.data;
+    },
+
+    // Сохранение/онбординг адреса
+    updateProfile: async (data: {
+        maxUserId: string;
+        companyId: string;
+        houseId: number;
+        apartment: string;
+        phone?: string;
+        name?: string;
+    }) => {
+        const response = await api.post('/residents/profile', data);
+        return response.data;
+    }
+};
+
 export const ticketsApi = {
-  // Достаем массив из ключа .tickets или .data, если бэк отдал объект
   getTickets: async (params: any) => {
     // Спорный момент: убедись, что тут правильный эндпоинт для заявок диспетчера, например '/tickets'
     const res = (await api.get('/tickets', { params })).data; 
     if (Array.isArray(res)) return res;
     return res?.tickets || res?.data || [];
+  },
+
+  getByResident: async (maxUserId: string) => {
+      const response = await api.get('/tickets/by-resident', {
+          params: { maxUserId }
+      });
+      return response.data;
+  },
+
+  createByResident: async (data: {
+      maxUserId: string;
+      companyId: string;
+      houseId: number;
+      apartment: string;
+      description: string;
+      }) => {
+      const response = await api.post('/tickets', data);
+      return response.data;
   },
 
   getMyTickets: async (params: any) => {
@@ -37,7 +75,6 @@ export const ticketsApi = {
   assignMaster: async (data: { ticketId: number; masterId: number }) => 
     (await api.post('/tickets/assign', data)).data,
 
-  // ИСПРАВЛЕНО: Возвращаем методы, которые заждался MasterDashboard
   acceptByMaster: async (data: { ticketId: number; masterId: number }) => 
     (await api.post('/tickets/master/accept', data)).data,
 
@@ -66,10 +103,13 @@ export const dictApi = {
   
   // Бэкенд возвращает { house: ... }, берем его. Если что-то пошло не так, возвращаем весь объект
   return responseData?.house || responseData;
-},
+  },
 
-  // ИСПРАВЛЕНО: Теперь эта функция ВСЕГДА возвращает чистый массив, 
-  // вытаскивая его из твоего ключа { masters: [...] }
+  getCompanies: async () => {
+        const response = await api.get('/companies');
+        return response.data;
+  },
+
   getMasters: async (companyId: string) => {
     const res = (await api.get('/users/masters', { params: { companyId } })).data;
     if (Array.isArray(res)) return res;

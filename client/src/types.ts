@@ -28,6 +28,10 @@ export interface Ticket {
   completedAt?: string | null;
   companyId: string;
   masterId?: number | null;
+  master?: {
+    id: number;
+    name: string;
+  } | null;
   managerRating?: number | null;
   managerComment?: string | null;
 }

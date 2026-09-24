@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import prisma from '../lib/prisma.js';
-import crypto from 'crypto';
 import { requireAuth } from '../middleware/auth.js';
+import { sendNotificationToResident } from '../services/maxBot.js';
 
 const router = Router();
 
 /**
- * 1. POST / — Создание заявки из веб-панели (Диспетчер / Админ)
+    POST / — Создание заявки из веб-панели (Диспетчер / Админ)
  */
 router.post('/', requireAuth(['dispatcher', 'admin']), async (req: Request, res: Response): Promise<any> => {
     const { companyId, address, description, type, photos } = req.body;
@@ -197,7 +197,7 @@ router.post('/by-resident', async (req: Request, res: Response): Promise<any> =>
                 photos: photos?.length
                     ? {
                         create: photos.map((url: string) => ({ url }))
-                      }
+                        }
                     : undefined
             },
             include: {
@@ -219,7 +219,7 @@ router.post('/by-resident', async (req: Request, res: Response): Promise<any> =>
 });
 
 /**
- * 2. POST /assign — Назначение мастера на заявку (Диспетчер / Админ)
+    POST /assign — Назначение мастера на заявку (Диспетчер / Админ)
  */
 router.post('/assign', requireAuth(['dispatcher', 'admin']), async (req: Request, res: Response): Promise<any> => {
     const { ticketId, masterId } = req.body;
@@ -246,7 +246,7 @@ router.post('/assign', requireAuth(['dispatcher', 'admin']), async (req: Request
 });
 
 /**
- * 3. POST /master/accept — Принятие заявки мастером (Мастер / Админ)
+    POST /master/accept — Принятие заявки мастером (Мастер / Админ)
  */
 router.post('/master/accept', requireAuth(['master', 'admin']), async (req: Request, res: Response): Promise<any> => {
     const { ticketId } = req.body;
@@ -273,7 +273,7 @@ router.post('/master/accept', requireAuth(['master', 'admin']), async (req: Requ
 });
 
 /**
- * 4. POST /master/complete — Завершение заявки мастером (Мастер / Админ)
+    POST /master/complete — Завершение заявки мастером (Мастер / Админ)
  */
 router.post('/master/complete', requireAuth(['master', 'admin']), async (req: Request, res: Response): Promise<any> => {
     const { ticketId } = req.body;
@@ -295,8 +295,18 @@ router.post('/master/complete', requireAuth(['master', 'admin']), async (req: Re
             data: {
                 status: 'completed',
                 completedAt: new Date()
+            },
+            include: {
+                resident: true
             }
         });
+
+        if (ticket.resident?.maxUserId) {
+            await sendNotificationToResident(
+                ticket.resident.maxUserId,
+                `Ваша заявка №${ticket.id} («${ticket.description}») принята мастером в работу!`
+            );
+            }
 
         return res.json({ success: true, ticket });
     } catch (error) {
@@ -306,7 +316,7 @@ router.post('/master/complete', requireAuth(['master', 'admin']), async (req: Re
 });
 
 /**
- * 5. POST /dispatcher/close — Принудительное закрытие заявки (Диспетчер / Админ)
+    POST /dispatcher/close — Принудительное закрытие заявки (Диспетчер / Админ)
  */
 router.post('/dispatcher/close', requireAuth(['dispatcher', 'admin']), async (req: Request, res: Response): Promise<any> => {
     const { ticketId } = req.body;
@@ -345,40 +355,7 @@ router.post('/dispatcher/close', requireAuth(['dispatcher', 'admin']), async (re
 });
 
 /**
- * 6. POST /tilda-direct-ticket — Публичный эндпоинт заявки с Тильды (БЕЗ auth)
- */
-router.post('/tilda-direct-ticket', async (req: Request, res: Response): Promise<any> => {
-    try {
-        const { address, description, type, companyId } = req.body;
-        
-        const trackingToken = crypto.randomBytes(8).toString('hex');
-
-        const newTicket = await prisma.ticket.create({
-            data: {
-                address,
-                description,
-                type: type || 'regular',
-                status: 'new',
-                companyId,
-                trackingToken
-            }
-        });
-
-        const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
-        const trackingLink = `${clientUrl}/status/${trackingToken}`;
-
-        return res.status(200).json({ 
-            success: true, 
-            trackingLink
-        }); 
-    } catch (error) {
-        console.error('Ошибка при создании заявки с Тильды:', error);
-        return res.status(500).json({ error: 'Ошибка сервера' });
-    }
-});
-
-/**
- * 7. GET /my — Личные заявки мастера (Мастер / Админ)
+    GET /my — Личные заявки мастера (Мастер / Админ)
  */
 router.get('/my', requireAuth(['master', 'admin']), async (req: Request, res: Response): Promise<any> => {
     try {
@@ -446,7 +423,7 @@ router.get('/by-resident', async (req: Request, res: Response): Promise<any> => 
 });
 
 /**
- * 8. GET / — Список всех заявок для рабочего стола (Диспетчер / Админ)
+    GET / — Список всех заявок для рабочего стола (Диспетчер / Админ)
  */
 router.get('/', requireAuth(['dispatcher', 'admin']), async (req: Request, res: Response): Promise<any> => {
     try {
