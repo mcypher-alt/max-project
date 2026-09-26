@@ -51,14 +51,17 @@ export const ticketsApi = {
   },
 
   createByResident: async (data: {
-      maxUserId: string;
-      companyId: string;
-      houseId: number;
-      apartment: string;
-      description: string;
-      }) => {
-      const response = await api.post('/tickets', data);
-      return response.data;
+    maxUserId: string;
+    companyId?: string | number;
+    houseId?: number;
+    address?: string;
+    apartment?: string;
+    description: string;
+    photos?: string[];
+  }): Promise<Ticket> => {
+    // Стучимся именно в созданный роут для жителя:
+    const res = await api.post('/tickets/by-resident', data);
+    return res.data?.ticket || res.data;
   },
 
   getMyTickets: async (params: any) => {

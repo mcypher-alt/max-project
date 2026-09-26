@@ -20,6 +20,7 @@ export interface User {
 export interface Ticket {
   id: number;
   address: string;
+  apartment: string;
   description: string;
   type: 'emergency' | 'regular';
   status: 'new' | 'in_work' | 'completed';

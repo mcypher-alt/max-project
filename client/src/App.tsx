@@ -8,7 +8,7 @@ import RegisterScreen from './screens/RegisterScreen.js';
 import DispatcherDashboard from './screens/DispatcherDashboard.js';
 import MasterDashboard from './screens/MasterDashboard.js';
 import ResetPasswordScreen from './screens/ResetPasswordScreen.js';
-import ResidentScreen from './screens/ResidentScreen.js'; // <-- Добавили импорт экрана жителя
+import ResidentScreen from './screens/ResidentScreen.js';
 import { authApi } from './api/index.js';
 
 const queryClient = new QueryClient();
@@ -19,10 +19,8 @@ const getInviteParams = () => {
     return { token };
 };
 
-// Функция определения, открыто ли приложение жителем из МАХ
 const isResidentEnvironment = () => {
     const params = new URLSearchParams(window.location.search);
-    // Открыто по ссылке вида ?mode=resident, или по роуту /resident, или передан WebApp от МАХ
     return (
         params.get('mode') === 'resident' ||
         window.location.pathname.startsWith('/resident') ||
@@ -31,20 +29,43 @@ const isResidentEnvironment = () => {
 };
 
 export default function App() {
-    // 1. ПРОВЕРКА: ЕСЛИ ЭТО ЖИТЕЛЬ ИЗ МАКСА — СРАЗУ ПОКАЗЫВАЕМ МИНИ-АПП
-    const isResident = isResidentEnvironment();
-    if (isResident) {
-        return <ResidentScreen />;
-    }
-
-    // === ДАЛЕЕ ВЕСЬ ТВОЙ СУЩЕСТВУЮЩИЙ КОД БЕЗ ИЗМЕНЕНИЙ ===
-    const [user, setUser] = useState<User | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState(true);
-
+    // 1. ТЕМА И ОПРЕДЕЛЕНИЕ СРЕДЫ (всегда на самом верху, ДО любых return)
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-        return (localStorage.getItem('theme') as 'light' | 'dark') || 'light';
+        const saved = localStorage.getItem('theme') as 'light' | 'dark';
+        if (saved) return saved;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     });
 
+    const isResident = isResidentEnvironment();
+
+    // 2. СИНХРОНИЗАЦИЯ ТЕМЫ ДЛЯ ВСЕХ ЭКРАНОВ
+    useEffect(() => {
+        const root = window.document.documentElement;
+        if (theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+    };
+
+    // 3. ЕСЛИ ЭТО ЖИТЕЛЬ ИЗ МАКСА — ОТДАЕМ МИНИ-АПП С ГОТОВОЙ ТЕМОЙ И УВЕДОМЛЕНИЯМИ
+    if (isResident) {
+        return (
+            <>
+                <Toaster position="top-right" richColors />
+                <ResidentScreen theme={theme} onToggleTheme={toggleTheme} />
+            </>
+        );
+    }
+
+    // === ДАЛЕЕ ЛОГИКА СОТРУДНИКОВ (ДИСПЕТЧЕРЫ И МАСТЕРА) ===
+    const [user, setUser] = useState<User | null>(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [inviteParams] = useState(() => getInviteParams());
     const [isRegistering, setIsRegistering] = useState(!!inviteParams.token);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -64,16 +85,6 @@ export default function App() {
         };
         checkSession();
     }, []);
-
-    useEffect(() => {
-        const root = window.document.documentElement;
-        if (theme === 'dark') {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-        localStorage.setItem('theme', theme);
-    }, [theme]);
 
     const handleLogin = (loggedUser: User) => {
         setUser(loggedUser);
@@ -98,7 +109,7 @@ export default function App() {
         );
     }
 
-    // === РОУТИНГ БЕЗ АВТОРИЗАЦИИ ===
+    // Роутинг без авторизации
     if (!user) {
         if (isRegistering && inviteParams.token) {
             return (
@@ -127,7 +138,7 @@ export default function App() {
         );
     }
 
-    // === ОСНОВНОЙ ИНТЕРФЕЙС СОТРУДНИКОВ ===
+    // Рабочее место сотрудника
     return (
         <QueryClientProvider client={queryClient}>
             <Toaster position="top-right" richColors />
@@ -139,7 +150,7 @@ export default function App() {
                     
                     <div className="flex gap-4 items-center">
                         <button 
-                            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                            onClick={toggleTheme}
                             className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-lg hover:scale-105 active:scale-95 transition-all"
                             title="Переключить тему"
                         >
