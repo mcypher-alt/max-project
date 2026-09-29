@@ -6,7 +6,7 @@
 
 ## 🛠 Стек технологий
 
-* **Frontend:** React 19, Vite, TanStack Query (React Query), Tailwind CSS, Lucide / Heroicons.
+* **Frontend:** React 19, Vite, TanStack Query (React Query), Tailwind CSS, Heroicons.
 * **Backend:** Node.js, Express, Prisma ORM, AWS SDK v3 (`@aws-sdk/client-s3`).
 * **База данных:** PostgreSQL 16 (Alpine).
 * **Объектное хранилище:** Garage v2.3 (высокопроизводительное легковесное S3-хранилище на Rust).
@@ -21,84 +21,79 @@
            │
      ┌─────┴──────────────┐
      │                    │
-┌────▼─────────┐   ┌──────▼───────┐
-│ client (:80) │   │ server (:5000│
-│  (React/SPA) │   │ (Express/API)│
-└──────────────┘   └──────┬───────┘
+┌────▼──────────┐  ┌──────▼──────────┐
+│ client (:80)  │  │ server (:5000)  │
+│  (React/SPA)  │  │  (Express/API)  │
+└───────────────┘  └──────┬──────────┘
                           │
             ┌─────────────┴─────────────┐
             │                           │
      ┌──────▼──────┐             ┌──────▼──────┐
-     │  db (:5432) │             │storage(:3900│
-     │(PostgreSQL) │             │(Garage S3)  │
+     │  db (:5432) │             │storage(:3900)
+     │(PostgreSQL) │             │ (Garage S3) │
      └─────────────┘             └─────────────┘
-
 ```
 
 ---
 
 ## 📋 Предварительные требования
 
-Перед развертыванием убедитесь, что на целевом сервере/машине установлены:
+Перед развертыванием убедитесь, что на целевом сервере или локальной машине установлены:
 
 * **Docker Engine** (версия 24.0+)
 * **Docker Compose** (V2 plugin)
-* Утилита `openssl` (для генерации секретных ключей)
+* Утилита **openssl** (для генерации секретных ключей)
 
 ---
 
 ## ⚙️ Конфигурация окружения
 
-Для запуска требуются два конфигурационных файла: корневой `.env` (для Docker Compose) и внутренний `server/.env` (для Node.js/Prisma).
+Все переменные окружения проекта централизованно хранятся в одном файле — **`server/.env`**.
 
-### 1. Корневой файл `.env`
+---
 
-Создайте файл `.env` в корневой директории проекта:
+### 1. Файл `server/.env`
 
-```bash
-# Порты сервисов на хосте
-CLIENT_PORT=3000
-SERVER_PORT=5000
+Создайте файл `server/.env` со следующим содержимым:
 
-# Параметры базы данных PostgreSQL
-POSTGRES_USER=app_user
-POSTGRES_PASSWORD=generate_strong_password_here
-POSTGRES_DB=housing_services
+```env
+# Токен бота в мессенджере МАХ
+MAX_BOT_TOKEN="f9LHodD0cOIH6FOiG5zmRXHDpyMl67_moITW72qjHAgz7t0Qd6BQtOoUjyblKKqXsQCO26AWx5KzyYc857t0"
 
-# Параметры S3 хранилища Garage
-GARAGE_ACCESS_KEY=GK1234567890abcdef12345678
-GARAGE_SECRET_KEY=9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba
-S3_BUCKET_NAME=tickets
-# Сгенерируйте случайный 32-байтный hex-ключ командой: openssl rand -hex 32
-GARAGE_RPC_SECRET=fae8b196894c25147814b7e80c52bb89a244410a76a521ef314e365020df111a
+# База данных PostgreSQL
+DATABASE_URL=postgresql://dev:password@db:5432/main_db
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=password
+POSTGRES_DB=main_db
 
-```
+# Секрет для JWT-токенов сотрудников
+JWT_SECRET=277ed2453219b7b05fa0a166974d8de5e03928214d8d483b27d5c115ef22f7eb
 
-### 2. Файл `server/.env`
-
-Создайте файл `.env` внутри директории `server/`:
-
-```bash
-PORT=5000
+# Параметры Express-сервера и сети
 NODE_ENV=production
+PORT=5000
+CLIENT_URL=https://uk-web.ru
+TRUSTED_PROXIES=loopback,172.18.0.0/16
 
-# Подключение к PostgreSQL внутри Docker-сети
-DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public"
+# Подключение к S3 (Garage S3)
+S3_ENDPOINT=http://storage:3900
+S3_ACCESS_KEY=GKb4ec413e87c0cd5b3d3ccc7c
+S3_SECRET_KEY=f70a29de2a15a83d4fcbeaaae8c9e3569858f7ae4e88817633bf70428885fe3a
+S3_BUCKET_NAME=uploads
+S3_REGION=us-east-1
+S3_PUBLIC_URL=https://uk-web.ru/api/files
 
-# Подключение к хранилищу Garage S3 внутри Docker-сети
-S3_ENDPOINT="http://storage:3900"
-S3_REGION="garage"
-S3_BUCKET="tickets"
-S3_FORCE_PATH_STYLE="true"
-
-# Секрет для выпуска JWT-токенов сотрудников
-JWT_SECRET=super_secret_jwt_key_change_me
-
+# Ключи и настройки хранилища Garage S3
+GARAGE_ACCESS_KEY=GKb4ec413e87c0cd5b3d3ccc7c
+GARAGE_SECRET_KEY=f70a29de2a15a83d4fcbeaaae8c9e3569858f7ae4e88817633bf70428885fe3a
+GARAGE_RPC_SECRET=e68cb62bf94d011f4c04738345a56624f4bbe6027a912ea25bbbb430a6e58383
 ```
 
-### 3. Конфигурация Garage (`deployment/garage.toml`)
+---
 
-Убедитесь, что в директории `deployment/` создан базовый файл конфигурации `garage.toml`:
+### 2. Конфигурация Garage (`deployment/garage.toml`)
+
+Файл монтируется в контейнер `storage` в режиме чтения. Убедитесь, что порт и регион совпадают с параметрами в `server/.env`:
 
 ```toml
 metadata_dir = "/var/lib/garage/meta"
@@ -113,67 +108,61 @@ rpc_public_addr = "127.0.0.1:3901"
 
 [s3_api]
 s3_bind_addr = "[::]:3900"
-s3_region = "garage"
+s3_region = "us-east-1"
 root_domain = ".s3.garage"
 
 [s3_web]
 bind_addr = "[::]:3902"
 root_domain = ".web.garage"
-
 ```
 
 ---
 
-## 🚀 Сборка и запуск
+## 🚀 Пошаговое развертывание
 
 1. **Клонируйте репозиторий:**
-```bash
-git clone <URL_РЕПОЗИТОРИЯ>
-cd <ИМЯ_ПАПКИ_ПРОЕКТА>
+   ```bash
+   git clone https://github.com/mcypher-alt/max-project.git
+   cd max-project
+   ```
 
-```
+2. **Настройте переменные окружения:**
+   Создайте файл `server/.env` по инструкции выше и свяжите его с корнем проекта символической ссылкой (для чтения параметров в `docker-compose.yml`):
+   ```bash
+   ln -s server/.env .env
+   ```
 
+3. **Соберите образы и запустите контейнеры:**
+   ```bash
+   docker compose up -d --build
+   ```
 
-2. **Соберите и запустите сервисы в фоновом режиме:**
-```bash
-docker compose up -d --build
+4. **Проверьте состояние сервисов:**
+   ```bash
+   docker compose ps
+   ```
+   *Все ключевые сервисы (`db`, `storage`, `server`, `client`) должны перейти в состояние `healthy`.*
 
-```
+5. **Примените миграции базы данных Prisma:**
+   ```bash
+   docker compose exec server npx prisma migrate deploy
+   ```
 
-
-3. **Проверьте статус готовности сервисов:**
-```bash
-docker compose ps
-
-```
-
-
-*Все контейнеры должны перейти в состояние `healthy`.*
-4. **Примените миграции базы данных:**
-```bash
-docker compose exec server npx prisma migrate deploy
-
-```
-
-
-5. *(Опционально)* Наполните базу тестовыми данными:
-```bash
-docker compose exec server npx prisma db seed
-
-```
-
-
+6. *(Опционально)* Наполните базу первичными справочниками и тестовыми данными:
+   ```bash
+   docker compose exec server npx prisma db seed
+   ```
 
 ---
 
 ## 🌐 Доступные интерфейсы и порты
 
 | Сервис | Адрес на хосте | Описание |
-| --- | --- | --- |
-| **Клиент (SPA)** | `[http://127.0.0.1:3000](http://127.0.0.1:3000)` | Рабочее место диспетчера / мастера |
-| **Мини-апп жителя** | `[http://127.0.0.1:3000/?mode=resident](http://127.0.0.1:3000/?mode=resident)` | Экран подачи обращений жителями |
-| **API Сервер** | `[http://127.0.0.1:5000](http://127.0.0.1:5000)` | REST API бэкенда |
-| **Healthcheck API** | `[http://127.0.0.1:5000/health](http://127.0.0.1:5000/health)` | Мониторинг работоспособности сервера |
+| :--- | :--- | :--- |
+| **Клиент (SPA)** | `http://127.0.0.1:3000` | Рабочее место диспетчера и мастера |
+| **Мини-апп жителя** | `http://127.0.0.1:3000/?mode=resident` | Экран подачи обращений жителями |
+| **API Сервер** | `http://127.0.0.1:5000` | REST API бэкенда |
+| **Healthcheck API** | `http://127.0.0.1:5000/health` | Эндпоинт проверки работоспособности сервера |
 | **S3 API (Garage)** | `http://storage:3900` *(внутренний)* | Точка входа для загрузки фото |
 
 ---
@@ -188,46 +177,35 @@ docker compose exec server npx prisma db seed
 ## 🛠 Полезные команды для обслуживания
 
 * **Просмотр логов в реальном времени:**
-```bash
-docker compose logs -f
-# Или конкретного сервиса:
-docker compose logs -f server
-docker compose logs -f storage
-
-```
-
+  ```bash
+  docker compose logs -f
+  # Или для конкретного сервиса:
+  docker compose logs -f server
+  docker compose logs -f storage
+  ```
 
 * **Перезапуск конкретного сервиса:**
-```bash
-docker compose restart server
+  ```bash
+  docker compose restart server
+  ```
 
-```
+* **Остановка комплекса:**
+  ```bash
+  docker compose down
+  ```
 
-
-* **Остановка всего комплекса:**
-```bash
-docker compose down
-
-```
-
-
-* **Остановка с полным удалением данных (БД и файлы хранилища):**
-```bash
-docker compose down -v
-
-```
-
+* **Остановка с удалением всех томов данных (БД и файлы хранилища):**
+  ```bash
+  docker compose down -v
+  ```
 
 * **Подключение к консоли PostgreSQL:**
-```bash
-docker compose exec db psql -U app_user -d housing_services
+  ```bash
+  docker compose exec db psql -U dev -d main_db
+  ```
 
-```
-
-
-* **Проверка состояния ноды Garage S3:**
-```bash
-docker compose exec storage /garage status
-docker compose exec storage /garage bucket list
-
-```
+* **Проверка состояния хранилища Garage S3:**
+  ```bash
+  docker compose exec storage /garage status
+  docker compose exec storage /garage bucket list
+  ```
