@@ -23,7 +23,6 @@ const extractTicketData = (ticket: Ticket | null) => {
     .replace(/\[PHOTO\]:(https?:\/\/[^\s]+)/g, '')
     .trim();
 
-  // Достаем фото из массива relation (если бэк присылает photos: [{ url }])
   const relationPhotos = Array.isArray((ticket as any).photos)
     ? (ticket as any).photos.map((p: any) => (typeof p === 'string' ? p : p.url))
     : [];
@@ -64,7 +63,7 @@ export default function DispatcherDashboard({ user }: { user: User }) {
     return Array.isArray(user.companyId) ? user.companyId : [user.companyId];
   })();
 
-  // Загрузка заявок
+  // 1. ЗАГРУЗКА ЗАЯВОК
   const { data: rawTicketsData, isLoading: isTicketsLoading } = useQuery({
     queryKey: ['tickets', filters, user.companyId],
     queryFn: async () => {
@@ -84,16 +83,37 @@ export default function DispatcherDashboard({ user }: { user: User }) {
     enabled: userCompanies.length > 0,
   });
 
-  // Загрузка мастеров для селекта
-  const { data: headerMasters = [] } = useQuery({
-    queryKey: ['header_masters', filters.companyId],
+  // 2. ЗАГРУЗКА ВСЕХ МАСТЕРОВ (для резолва имени в модалке и таблице)
+  const { data: allMasters = [] } = useQuery({
+    queryKey: ['all_masters', userCompanies],
     queryFn: async () => {
-      if (filters.companyId === 'all') return [];
-      const res = await dictApi.getMasters(filters.companyId);
-      return Array.isArray(res) ? res : (res as any)?.users || (res as any)?.data || [];
+      const requests = userCompanies.map((id) => dictApi.getMasters(id));
+      const responses = await Promise.all(requests);
+      return responses.flatMap((res) =>
+        Array.isArray(res) ? res : (res as any)?.users || (res as any)?.data || []
+      );
     },
-    enabled: filters.companyId !== 'all',
+    enabled: userCompanies.length > 0,
   });
+
+  // 3. ЗАГРУЗКА ДОМОВ (чтобы передать в CreateTicketModal)
+  const { data: houses = [] } = useQuery({
+    queryKey: ['houses', userCompanies],
+    queryFn: async () => {
+      const requests = userCompanies.map((id) => dictApi.getHouses(id));
+      const responses = await Promise.all(requests);
+      return responses.flatMap((res) =>
+        Array.isArray(res) ? res : (res as any)?.houses || (res as any)?.data || []
+      );
+    },
+    enabled: userCompanies.length > 0,
+  });
+
+  // Мастера только для шапки фильтра
+  const headerMasters =
+    filters.companyId === 'all'
+      ? allMasters
+      : allMasters.filter((m: any) => String(m.companyId) === String(filters.companyId));
 
   const closeMutation = useMutation({
     mutationFn: (ticketId: number) =>
@@ -115,6 +135,20 @@ export default function DispatcherDashboard({ user }: { user: User }) {
     (currentPage - 1) * TICKETS_PER_PAGE,
     currentPage * TICKETS_PER_PAGE
   );
+
+  // Хелпер для надежного определения имени мастера
+  const getAssignedMasterName = (ticket: Ticket | null) => {
+    if (!ticket) return 'Не назначен';
+    if ((ticket as any).master?.name) return (ticket as any).master.name;
+    if ((ticket as any).masterName) return (ticket as any).masterName;
+
+    const rawMasterId = (ticket as any).masterId || (ticket as any).master;
+    if (rawMasterId) {
+      const found = allMasters.find((m: any) => String(m.id) === String(rawMasterId));
+      if (found) return found.name;
+    }
+    return 'Не назначен';
+  };
 
   // Инвайты
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -188,8 +222,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
   });
 
   const [ticketIdToConfirm, setTicketIdToConfirm] = useState<number | null>(null);
-
-  // Детали выбранной для просмотра заявки
   const activeTicketDetails = extractTicketData(selectedTicket);
 
   return (
@@ -295,7 +327,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                         key={ticket.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group"
                       >
-                        {/* ID и Компания */}
                         <td className="px-6 py-4 font-bold text-gray-900 dark:text-white align-top">
                           #{ticket.id}
                           <div className="text-xs text-gray-400 font-normal mt-0.5">
@@ -303,7 +334,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                           </div>
                         </td>
 
-                        {/* Адрес */}
                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 align-top whitespace-normal">
                           <div>{ticket.address}</div>
                           {ticket.apartment && (
@@ -311,7 +341,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                           )}
                         </td>
 
-                        {/* Проблема + превью модалки */}
                         <td className="px-6 py-4 align-top max-w-md">
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             {ticket.type === 'emergency' ? (
@@ -329,7 +358,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                               </span>
                             )}
 
-                            {/* Бейдж количества фото */}
                             {photos.length > 0 && (
                               <button
                                 type="button"
@@ -342,7 +370,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                             )}
                           </div>
 
-                          {/* Кликабельный текст проблемы */}
                           <div
                             onClick={() => setSelectedTicket(ticket)}
                             className="cursor-pointer group/desc"
@@ -357,17 +384,14 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                           </div>
                         </td>
 
-                        {/* Статус */}
                         <td className="px-6 py-4 align-top">
                           <StatusBadge status={ticket.status} />
                         </td>
 
-                        {/* Мастер */}
                         <td className="px-6 py-4 align-top">
                           <MasterCell ticket={ticket} />
                         </td>
 
-                        {/* Дата создания */}
                         <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs align-top pt-5">
                           {new Date(ticket.createdAt).toLocaleDateString('ru-RU', {
                             day: 'numeric',
@@ -377,7 +401,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
                           })}
                         </td>
 
-                        {/* Действие закрытия */}
                         <td className="px-6 py-4 text-right align-top">
                           {ticket.status !== 'completed' &&
                             (ticketIdToConfirm === ticket.id ? (
@@ -446,9 +469,7 @@ export default function DispatcherDashboard({ user }: { user: User }) {
         )}
       </div>
 
-      {/* ======================================================== */}
-      {/* МОДАЛКА: ПРОСМОТР ОПИСАНИЯ И ФОТОГРАФИЙ ЗАЯВКИ          */}
-      {/* ======================================================== */}
+      {/* МОДАЛКА ПРОСМОТРА ЗАЯВКИ */}
       {selectedTicket && (
         <div
           onClick={() => setSelectedTicket(null)}
@@ -458,7 +479,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-5 cursor-default max-h-[90vh] overflow-y-auto"
           >
-            {/* ШАПКА МОДАЛКИ */}
             <div className="flex items-start justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -493,7 +513,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
               </button>
             </div>
 
-            {/* КАРТОЧКА АДРЕСА И ИНФОРМАЦИИ */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 dark:bg-gray-900/50 p-3.5 rounded-xl border border-gray-100 dark:border-gray-750 text-xs">
               <div>
                 <span className="text-gray-400 block mb-0.5">Адрес</span>
@@ -510,13 +529,13 @@ export default function DispatcherDashboard({ user }: { user: User }) {
               </div>
               <div>
                 <span className="text-gray-400 block mb-0.5">Назначенный мастер</span>
+                {/* Теперь имя мастера гарантированно находится по ID */}
                 <span className="font-semibold text-blue-600 dark:text-blue-400">
-                  {(selectedTicket as any).master?.name || 'Не назначен'}
+                  {getAssignedMasterName(selectedTicket)}
                 </span>
               </div>
             </div>
 
-            {/* СУТЬ ПРОБЛЕМЫ */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
                 Описание проблемы
@@ -528,7 +547,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
               </div>
             </div>
 
-            {/* ГАЛЕРЕЯ ФОТОГРАФИЙ */}
             {activeTicketDetails.photos.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
@@ -557,7 +575,6 @@ export default function DispatcherDashboard({ user }: { user: User }) {
               </div>
             )}
 
-            {/* НИЖНЯЯ ПАНЕЛЬ ДЕЙСТВИЙ */}
             <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
               {selectedTicket.status !== 'completed' && (
                 <button
@@ -581,9 +598,7 @@ export default function DispatcherDashboard({ user }: { user: User }) {
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* ЛАЙТБОКС: ПОЛНОРАЗМЕРНЫЙ ПРОСМОТР КАРТИНКИ               */}
-      {/* ======================================================== */}
+      {/* ЛАЙТБОКС ФОТО */}
       {zoomedPhoto && (
         <div
           onClick={() => setZoomedPhoto(null)}
@@ -605,7 +620,7 @@ export default function DispatcherDashboard({ user }: { user: User }) {
         </div>
       )}
 
-      {/* ОСТАЛЬНЫЕ МОДАЛКИ */}
+      {/* МОДАЛКИ */}
       <InviteEmployeeModal
         isOpen={isInviteModalOpen}
         onClose={() => {
@@ -629,10 +644,12 @@ export default function DispatcherDashboard({ user }: { user: User }) {
         isPending={createHouseMutation.isPending}
       />
 
+      {/* Теперь дома проброшены внутрь модалки */}
       <CreateTicketModal
         isOpen={isCreateTicketOpen}
         onClose={() => setIsCreateTicketOpen(false)}
         userCompanies={userCompanies}
+        houses={houses}
         onSubmit={(formData) => createTicketMutation.mutate(formData)}
         isPending={createTicketMutation.isPending}
       />
